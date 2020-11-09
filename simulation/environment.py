@@ -62,6 +62,7 @@ class Robot(PygameElement):
         self.render_kw = render_kw
 
         self.map = Map(size=map_size)
+        self.occupancy_grid = OccupancyGrid(size=map_size)
 
         self.radar_animations = [self.render_kw['size'] for _ in range(3)]
         self.radar_diff = (self.sight_radius - self.render_kw['size']) / len(self.radar_animations) 
@@ -90,6 +91,8 @@ class Robot(PygameElement):
                 if self.radar_hitbox.colliderect(elem.hitbox):
                     in_sight.append(elem)
                     self.map.add(elem.hitbox.topleft, elem.hitbox.bottomright)
+                    self.occupancy_grid.discover_occupied(elem.hitbox.topleft, elem.hitbox.bottomright)
+
 
 
         return in_sight
@@ -100,7 +103,7 @@ class Robot(PygameElement):
         self.orientation = np.dot(rotation_mat, self.orientation)
 
     def move(self):
-
+        self.occupancy_grid.discover_rect(self.radar_hitbox.topleft, self.radar_hitbox.bottomright)
         self.last_pos = self.pos.copy()
         self.pos += self.orientation * self.speed
     
@@ -121,6 +124,12 @@ class Robot(PygameElement):
         self.hitbox = pygame.Rect(self.pos[0]-s, self.pos[1]-s, 2*s, 2*s)
 
         self.radar_hitbox = pygame.Rect(self.pos[0]-self.sight_radius, self.pos[1]-self.sight_radius, 2*self.sight_radius, 2*self.sight_radius)
+
+    def draw_map_with_function(self, f):
+        self.occupancy_grid.draw_map_with_function(f)
+    
+    def draw_on_surface(self, surface):
+        pygame.draw.circle(surface, self.render_kw['color'], self.pos, 5)
 
 class Trash(PygameElement):
     objs = []
@@ -188,8 +197,73 @@ class Wall(PygameElement):
         unit = self.unit_vec()
         return np.array([-unit[1], unit[0]])
 
+class OccupancyGrid:
+
+    def __init__(self, size):
+        self.size = size
+
+        self.unknown = np.ones(size)
+        self.free = np.zeros(size)
+        self.frontier = np.zeros(size)
+        self.occupied = np.zeros(size)
+
+    def draw_map_with_function(self, f):
+        convert = lambda arr, val: np.stack((arr*val,)*3, axis=-1)
+        # f(convert(self.unknown, 0))
+        # f(convert(self.free, 255))
+        # f(convert(self.occupied, 125))
+        f(convert(self.frontier, 200))
+
+    def discover_point(self, p):
+        for sp in self.get_surrounding_points(p):
+            if self.unknown[p[0]][p[1]] == 1:
+                self.frontier[p[0]][p[1]] = 1
+
+        # self.unknown[p[0]][p[1]] = 0        
+        self.frontier[p[0]][p[1]] = 0
+        # self.free[p[0]][p[1]] = 1
+
+    def discover_rect(self, tl, br):
+
+        # self.unknown[tl[0]:br[0], tl[1]:br[1]] = 0
+        self.frontier[tl[0]:br[0], tl[1]:br[1]] = 0
+        # self.free[tl[0]:br[0], tl[1]:br[1]] = 1
+
+        for dy in range(tl[1], br[1]):
+            for x in (tl[0], br[0]):
+                p = (x,dy)
+                for sp in self.get_surrounding_points(p):
+                    try:
+                        if self.unknown[p[0]][p[1]] == 1:
+                            self.frontier[p[0]][p[1]] = 1
+                    except:
+                        pass
+        for dx in range(tl[0], br[0]):
+            for y in (tl[1], br[1]):
+                p = (dx, y)
+                for sp in self.get_surrounding_points(p):
+                    try:
+                        if self.unknown[p[0]][p[1]] == 1:
+                            self.frontier[p[0]][p[1]] = 1
+                    except:
+                        pass
+
+    def discover_occupied(self, tl, br):
+
+        self.unknown[tl[0]:br[0], tl[1]:br[1]] = 0
+        self.frontier[tl[0]:br[0], tl[1]:br[1]] = 0
+        self.free[tl[0]:br[0], tl[1]:br[1]] = 0
+        self.occupied[tl[0]:br[0], tl[1]:br[1]] = 1
 
 
+    def get_surrounding_points(self, point):
+        points = []
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                if i == j == 0:
+                    continue
+                points.append((point[0] + i, point[1] + j))
+        return points
 
 
 class Map:

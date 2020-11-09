@@ -70,7 +70,6 @@ class ScreenManager:
         self.screen.blit(self.surfaces['left'], (0,0))
         self.screen.blit(self.surfaces['right'], (WINDOW_SIZE[0]//2, 0))
         self.surfaces['left'].fill(WHITE)
-        self.surfaces['right'].fill(BLACK)
         for surface_name, elems in self.elems.items():
             surface = self.surfaces[surface_name]
             for elem, layer in elems:
@@ -130,11 +129,11 @@ for wall in get_surrounding_walls(screen_mgr.surfaces['left'], size=5):
 # #     screen_mgr.add_elem(t, 'left')
 # #     trashes.append(t)
 
-walls = []
-for _ in range(RANDOM_WALL_NB):
-    for wall in Wall.spawn_random(screen_mgr.surfaces['left'], 20):
-        screen_mgr.add_elem(wall, 'left')
-        walls.append(wall)
+# walls = []
+# for _ in range(RANDOM_WALL_NB):
+#     for wall in Wall.spawn_random(screen_mgr.surfaces['left'], 20):
+#         screen_mgr.add_elem(wall, 'left')
+#         walls.append(wall)
 
 
 mv_mgr = MovingManager()
@@ -192,7 +191,8 @@ while True:
     screen_mgr.draw()
     pygame.display.flip()
 
-    screen_mgr.blitarray_right(robot.map.grid)
+    robot.draw_map_with_function(screen_mgr.blitarray_right)
+    robot.draw_on_surface(screen_mgr.surfaces['right'])
 
     robot.in_sight()
 
